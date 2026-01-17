@@ -5,6 +5,7 @@ A lightweight, single-thread async Rust web API with a NestJS-like folder struct
 ## Features
 
 - Single-thread async runtime (Tokio current-thread)
+- Strongly inspired on NestJS proven development patterns 
 - Request/Response primitives with automatic status lines
 - Controller-first route declarations (NestJS-like)
 - Domain-driven structure: controller, service, repo, DTO

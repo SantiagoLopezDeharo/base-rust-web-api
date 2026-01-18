@@ -1,4 +1,6 @@
+use dotenv::dotenv;
 use std::collections::HashMap;
+use std::env;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{Semaphore, mpsc};
@@ -80,12 +82,21 @@ async fn handle_connection(mut stream: TcpStream, _permit: tokio::sync::OwnedSem
 }
 
 fn main() {
+    dotenv().ok();
     println!("Hello, world!");
     init(init_routes());
 
-    let cores = std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(1);
+    let cores = env::var("CORES")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .unwrap_or_else(|| {
+            std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(1)
+        });
+
+    let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+    let bind_addr = format!("127.0.0.1:{}", port);
 
     let max_connections = cores * 1024;
     let connection_limiter = std::sync::Arc::new(Semaphore::new(max_connections));
@@ -116,7 +127,7 @@ fn main() {
         .unwrap();
 
     runtime.block_on(async move {
-        let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
+        let listener = TcpListener::bind(&bind_addr).await.unwrap();
         let mut next = 0usize;
 
         loop {

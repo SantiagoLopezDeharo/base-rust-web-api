@@ -37,6 +37,19 @@ src/
   main.rs
 ```
 
+
+## Configuration (.env)
+
+You can override the default port and number of worker threads by creating a `.env` file in the project root:
+
+```
+# .env
+PORT=80   # Server port (default: 8080)
+CORES=4     # Number of worker threads (default: all available cores)
+```
+
+These values will be loaded automatically at startup.
+
 ## Running the Server
 
 ```bash

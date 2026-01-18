@@ -65,17 +65,65 @@ This will:
 - Add the entity to `src/domain/mod.rs`.
 - Register the controller routes in `src/routing/init.rs`.
 
+## Creating a New Middleware
+
+Use the scaffold CLI to generate a new middleware:
+
+```bash
+cargo run --bin scaffold_middleware -- Auth
+```
+
+This will:
+- Create `src/middlewares/auth.rs`.
+- Add it as `pub mod auth;` in `src/middlewares/mod.rs`.
+
 ## Adding Controller Routes
 
 Routes are declared inside each controller’s `routes()` method using the `route!` macro:
 
 ```rust
-Route::new("GET", &["dog"], route!(DogController::get_all))
+Route::new("GET", &["dog"], vec![route!(DogController::get_all)])
 ```
 
 Handlers receive:
-- `Request`
+- `&mut Request`
 - `RouteParams` (path params like `:id` are available via `params.get("id")`)
+
+## Middleware Support
+
+Routes accept an array of functions (middlewares + final handler). Handlers are executed in order, and the last handler's `Response` is returned.
+
+```rust
+Route::new(
+  "GET",
+  &["dog"],
+  vec![
+    middleware!(DogMiddleware::log_request),
+    middleware!(DogMiddleware::authorize),
+    route!(DogController::get_all),
+  ],
+)
+```
+
+Middleware signature (See the section above to see how to use the cli to create a new middleware automatically) :
+
+```rust
+pub async fn log_request(
+  request: &mut Request,
+  params: &RouteParams,
+  handlers: &mut Vec<Handler>,
+) -> Response {
+  // ...before
+  // If we detect an error or auth failure we can
+  // return prematurly the response object to the router without
+  // executing the next functions
+  let response = next_handler(request, params, handlers).await;
+  // ...after
+  response
+}
+```
+
+IMPORTANT: use earlier handlers for middleware and put the main controller action last.
 
 ## Example Request
 

@@ -3,14 +3,31 @@ use crate::primitives::http::response::Response;
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 pub mod init;
 pub use init::init_routes;
 
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
-pub type Handler =
-    Box<dyn for<'a> Fn(&'a Request, &'a RouteParams) -> BoxFuture<'a, Response> + Send + Sync>;
+pub type ControllerHandler =
+    Box<dyn for<'a> Fn(&'a mut Request, &'a RouteParams) -> BoxFuture<'a, Response> + Send + Sync>;
+pub type MiddlewareHandler = Box<
+    dyn for<'a> Fn(
+            &'a mut Request,
+            &'a RouteParams,
+            &'a mut Vec<Handler>,
+        ) -> BoxFuture<'a, Response>
+        + Send
+        + Sync,
+>;
+
+#[allow(dead_code)]
+pub enum HandlerKind {
+    Middleware(MiddlewareHandler),
+    Controller(ControllerHandler),
+}
+
+pub type Handler = Arc<HandlerKind>;
 
 #[derive(Debug, Default)]
 pub struct RouteParams {
@@ -26,15 +43,19 @@ impl RouteParams {
 pub struct Route {
     pub method: &'static str,
     pub path: &'static [&'static str],
-    pub handler: Handler,
+    pub handlers: Vec<Handler>,
 }
 
 impl Route {
-    pub fn new(method: &'static str, path: &'static [&'static str], handler: Handler) -> Self {
+    pub fn new(
+        method: &'static str,
+        path: &'static [&'static str],
+        handlers: Vec<Handler>,
+    ) -> Self {
         Self {
             method,
             path,
-            handler,
+            handlers,
         }
     }
 }
@@ -42,7 +63,18 @@ impl Route {
 #[macro_export]
 macro_rules! route {
     ($handler:path) => {
-        Box::new(|req, params| Box::pin($handler(req, params)))
+        std::sync::Arc::new($crate::routing::HandlerKind::Controller(Box::new(
+            |req, params| Box::pin($handler(req, params)),
+        )))
+    };
+}
+
+#[macro_export]
+macro_rules! middleware {
+    ($handler:path) => {
+        std::sync::Arc::new($crate::routing::HandlerKind::Middleware(Box::new(
+            |req, params, handlers| Box::pin($handler(req, params, handlers)),
+        )))
     };
 }
 
@@ -56,7 +88,7 @@ pub fn routes() -> &'static [Route] {
     ROUTES.get().map(|r| r.as_slice()).unwrap_or(&[])
 }
 
-pub async fn route(request: &Request) -> Response {
+pub async fn route(request: &mut Request) -> Response {
     let path = request.url.split('?').next().unwrap_or("");
 
     let segments: Vec<&str> = path
@@ -75,7 +107,9 @@ pub async fn route(request: &Request) -> Response {
         };
         path_matched = true;
         if route_def.method == request.method {
-            return (route_def.handler)(request, &params).await;
+            let mut handlers = route_def.handlers.clone();
+            handlers.reverse();
+            return next_handler(request, &params, &mut handlers).await;
         }
     }
 
@@ -89,6 +123,27 @@ pub async fn route(request: &Request) -> Response {
         status_code: 404,
         headers,
         body: "Not Found".to_string(),
+    }
+}
+
+pub async fn next_handler(
+    request: &mut Request,
+    params: &RouteParams,
+    handlers: &mut Vec<Handler>,
+) -> Response {
+    if let Some(handler) = handlers.pop() {
+        match &*handler {
+            HandlerKind::Middleware(middleware) => middleware(request, params, handlers).await,
+            HandlerKind::Controller(controller) => controller(request, params).await,
+        }
+    } else {
+        let mut headers = HashMap::new();
+        headers.insert("Content-Type".to_string(), "text/plain".to_string());
+        Response {
+            status_code: 500,
+            headers,
+            body: "Middleware chain ended without controller".to_string(),
+        }
     }
 }
 

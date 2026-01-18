@@ -5,6 +5,7 @@ use tokio::sync::{Semaphore, mpsc};
 use tokio::time::{Duration, sleep};
 
 mod domain;
+mod middlewares;
 mod primitives;
 mod routing;
 use chrono::Utc;
@@ -65,7 +66,7 @@ async fn handle_connection(mut stream: TcpStream, _permit: tokio::sync::OwnedSem
         timestamp,
     };
 
-    let response = route(&request).await;
+    let response = route(&mut request).await;
 
     println!("//=====================//");
     println!("{}", request);

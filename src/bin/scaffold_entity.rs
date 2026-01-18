@@ -20,24 +20,34 @@ fn main() -> io::Result<()> {
 
     fs::create_dir_all(&entity_dir)?;
 
-    write_file_if_missing(entity_dir.join("mod.rs"), &format!(
-        "pub mod controller;\npub mod dto;\npub mod repo;\npub mod service;\n"
-    ))?;
+    write_file_if_missing(
+        entity_dir.join("mod.rs"),
+        &format!("pub mod controller;\npub mod dto;\npub mod repo;\npub mod service;\n"),
+    )?;
 
-    write_file_if_missing(entity_dir.join("dto.rs"), &format!(
-        "pub struct {}Dto {{\n    pub message: String,\n}}\n\nimpl {}Dto {{\n    pub fn new(message: String) -> Self {{\n        Self {{ message }}\n    }}\n}}\n",
-        entity_name, entity_name
-    ))?;
+    write_file_if_missing(
+        entity_dir.join("dto.rs"),
+        &format!(
+            "pub struct {}Dto {{\n    pub message: String,\n}}\n\nimpl {}Dto {{\n    pub fn new(message: String) -> Self {{\n        Self {{ message }}\n    }}\n}}\n",
+            entity_name, entity_name
+        ),
+    )?;
 
-    write_file_if_missing(entity_dir.join("repo.rs"), &format!(
-        "pub struct {}Repo;\n\nimpl {}Repo {{\n    pub fn new() -> Self {{\n        Self\n    }}\n}}\n",
-        entity_name, entity_name
-    ))?;
+    write_file_if_missing(
+        entity_dir.join("repo.rs"),
+        &format!(
+            "pub struct {}Repo;\n\nimpl {}Repo {{\n    pub fn new() -> Self {{\n        Self\n    }}\n}}\n",
+            entity_name, entity_name
+        ),
+    )?;
 
-    write_file_if_missing(entity_dir.join("service.rs"), &format!(
-        "use super::repo::{}Repo;\n\npub struct {}Service {{\n    _repo: {}Repo,\n}}\n\nimpl {}Service {{\n    pub fn new(repo: {}Repo) -> Self {{\n        Self {{ _repo: repo }}\n    }}\n\n    pub fn respond(&self) -> String {{\n        \"{}\".to_string()\n    }}\n}}\n",
-        entity_name, entity_name, entity_name, entity_name, entity_name, entity_name
-    ))?;
+    write_file_if_missing(
+        entity_dir.join("service.rs"),
+        &format!(
+            "use super::repo::{}Repo;\n\npub struct {}Service {{\n    _repo: {}Repo,\n}}\n\nimpl {}Service {{\n    pub fn new(repo: {}Repo) -> Self {{\n        Self {{ _repo: repo }}\n    }}\n\n    pub fn respond(&self) -> String {{\n        \"{}\".to_string()\n    }}\n}}\n",
+            entity_name, entity_name, entity_name, entity_name, entity_name, entity_name
+        ),
+    )?;
 
     let controller_template = r#"use std::collections::HashMap;
 
@@ -54,15 +64,15 @@ pub struct {{ENTITY}}Controller;
 impl {{ENTITY}}Controller {
     pub fn routes() -> Vec<Route> {
         vec![
-            Route::new("GET", &["{{MODULE}}"], route!({{ENTITY}}Controller::get_all)),
-            Route::new("POST", &["{{MODULE}}"], route!({{ENTITY}}Controller::create)),
-            Route::new("GET", &["{{MODULE}}", ":id"], route!({{ENTITY}}Controller::get_one)),
-            Route::new("PUT", &["{{MODULE}}", ":id"], route!({{ENTITY}}Controller::update)),
-            Route::new("DELETE", &["{{MODULE}}", ":id"], route!({{ENTITY}}Controller::delete)),
+            Route::new("GET", &["{{MODULE}}"], vec![route!({{ENTITY}}Controller::get_all)]),
+            Route::new("POST", &["{{MODULE}}"], vec![route!({{ENTITY}}Controller::create)]),
+            Route::new("GET", &["{{MODULE}}", ":id"], vec![route!({{ENTITY}}Controller::get_one)]),
+            Route::new("PUT", &["{{MODULE}}", ":id"], vec![route!({{ENTITY}}Controller::update)]),
+            Route::new("DELETE", &["{{MODULE}}", ":id"], vec![route!({{ENTITY}}Controller::delete)]),
         ]
     }
 
-    pub async fn get_all(_request: &Request, _params: &RouteParams) -> Response {
+    pub async fn get_all(_request: &mut Request, _params: &RouteParams) -> Response {
         let service = {{ENTITY}}Service::new({{ENTITY}}Repo::new());
         let body = service.respond();
         let mut headers = HashMap::new();
@@ -74,7 +84,7 @@ impl {{ENTITY}}Controller {
         }
     }
 
-    pub async fn get_one(_request: &Request, params: &RouteParams) -> Response {
+    pub async fn get_one(_request: &mut Request, params: &RouteParams) -> Response {
         let _id = params.get("id").unwrap_or("");
         let service = {{ENTITY}}Service::new({{ENTITY}}Repo::new());
         let body = service.respond();
@@ -87,7 +97,7 @@ impl {{ENTITY}}Controller {
         }
     }
 
-    pub async fn create(_request: &Request, _params: &RouteParams) -> Response {
+    pub async fn create(_request: &mut Request, _params: &RouteParams) -> Response {
         let service = {{ENTITY}}Service::new({{ENTITY}}Repo::new());
         let body = service.respond();
         let mut headers = HashMap::new();
@@ -99,7 +109,7 @@ impl {{ENTITY}}Controller {
         }
     }
 
-    pub async fn update(_request: &Request, params: &RouteParams) -> Response {
+    pub async fn update(_request: &mut Request, params: &RouteParams) -> Response {
         let _id = params.get("id").unwrap_or("");
         let service = {{ENTITY}}Service::new({{ENTITY}}Repo::new());
         let body = service.respond();
@@ -112,7 +122,7 @@ impl {{ENTITY}}Controller {
         }
     }
 
-    pub async fn delete(_request: &Request, params: &RouteParams) -> Response {
+    pub async fn delete(_request: &mut Request, params: &RouteParams) -> Response {
         let _id = params.get("id").unwrap_or("");
         let service = {{ENTITY}}Service::new({{ENTITY}}Repo::new());
         let body = service.respond();
@@ -134,9 +144,16 @@ impl {{ENTITY}}Controller {
     write_file_if_missing(entity_dir.join("controller.rs"), &controller_content)?;
 
     update_domain_mod(&domain_dir.join("mod.rs"), &module_name)?;
-    update_routing_init(&workspace_root.join("src/routing/init.rs"), &module_name, &entity_name)?;
+    update_routing_init(
+        &workspace_root.join("src/routing/init.rs"),
+        &module_name,
+        &entity_name,
+    )?;
 
-    println!("Entity '{}' scaffolded at src/domain/{}", entity_name, module_name);
+    println!(
+        "Entity '{}' scaffolded at src/domain/{}",
+        entity_name, module_name
+    );
     Ok(())
 }
 
@@ -201,13 +218,20 @@ fn update_domain_mod(mod_path: &Path, module_name: &str) -> io::Result<()> {
 }
 
 fn update_routing_init(init_path: &Path, module_name: &str, entity_name: &str) -> io::Result<()> {
-    let use_line = format!("use crate::domain::{}::controller::{}Controller;", module_name, entity_name);
+    let use_line = format!(
+        "use crate::domain::{}::controller::{}Controller;",
+        module_name, entity_name
+    );
     let extend_line = format!("    routes.extend({}Controller::routes());", entity_name);
 
     let mut content = fs::read_to_string(init_path).unwrap_or_default();
     if !content.contains(&use_line) {
         let mut lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
-        let insert_pos = lines.iter().rposition(|l| l.starts_with("use ")).map(|i| i + 1).unwrap_or(0);
+        let insert_pos = lines
+            .iter()
+            .rposition(|l| l.starts_with("use "))
+            .map(|i| i + 1)
+            .unwrap_or(0);
         lines.insert(insert_pos, use_line);
         content = lines.join("\n");
         content.push('\n');

@@ -13,6 +13,7 @@ pub struct Request {
     pub stream: TcpStream,
     pub remote_addr: Option<SocketAddr>,
     pub timestamp: DateTime<Utc>,
+    pub query_params: HashMap<String, String>,
 }
 
 impl fmt::Display for Request {

@@ -44,14 +44,16 @@ You can override the default port and number of worker threads by creating a `.e
 
 ```
 # .env
-PORT=80   # Server port (default: 8080)
-CORES=4   # Number of worker threads (default: all available cores)
-DB_HOST=localhost         # Postgres host (default: localhost)
-DB_PORT=5432              # Postgres port (default: 5432)
-DB_USER=postgres          # Postgres user (default: postgres)
-DB_PASS=postgres          # Postgres password (default: postgres)
-DB_NAME=postgres          # Postgres database name (default: postgres)
-DB_MAX_CONNECTIONS=10     # Max DB pool connections (default: 10)
+PORT=80                # Server port (default: 8080)
+CORES=4                # Number of worker threads (default: all available cores)
+BCRYPT_COST=12         # bcrypt cost factor for password hashing (default: 12)
+
+DB_HOST=localhost      # Postgres host (default: localhost)
+DB_PORT=5432           # Postgres port (default: 5432)
+DB_USER=postgres       # Postgres user (default: postgres)
+DB_PASS=postgres       # Postgres password (default: postgres)
+DB_NAME=postgres       # Postgres database name (default: postgres)
+DB_MAX_CONNECTIONS=10  # Max DB pool connections (default: 10)
 ```
 
 These values will be loaded automatically at startup.
@@ -152,7 +154,7 @@ To fetch data from the Postgres database, use the `db::query` function. It takes
 ```rust
 // Example: fetch a user by id
 let user_id = 42;
-let rows = db::query("SELECT * FROM users WHERE id = $1", vec![&user_id]).await?;
+let rows = db::query("SELECT * FROM users WHERE id = $1", vec![DbParam::Int32(user_id)]).await?;
 for row in rows {
   let name: String = row.try_get("name")?;
   // ...

@@ -11,6 +11,7 @@ mod domain;
 mod middlewares;
 mod primitives;
 mod routing;
+mod util;
 use chrono::Utc;
 use primitives::http::request::Request;
 use routing::{init, init_routes, route};
@@ -59,6 +60,18 @@ async fn handle_connection(mut stream: TcpStream, _permit: tokio::sync::OwnedSem
         }
     }
 
+    // Build query_params from URL
+    let mut query_params = HashMap::new();
+    if let Some(idx) = url.find('?') {
+        let query = &url[idx + 1..];
+        for pair in query.split('&') {
+            let mut kv = pair.splitn(2, '=');
+            if let (Some(k), Some(v)) = (kv.next(), kv.next()) {
+                query_params.insert(k.to_string(), v.to_string());
+            }
+        }
+    }
+
     let mut request = Request {
         method,
         url,
@@ -67,6 +80,7 @@ async fn handle_connection(mut stream: TcpStream, _permit: tokio::sync::OwnedSem
         stream,
         remote_addr,
         timestamp,
+        query_params,
     };
 
     let response = route(&mut request).await;

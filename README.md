@@ -125,18 +125,6 @@ pub async fn log_request(
 
 IMPORTANT: use earlier handlers for middleware and put the main controller action last.
 
-## Example Request
-
-```bash
-curl http://127.0.0.1:8080/dog
-```
-
-The default Dog controller responds with:
-
-```
-Woof
-```
-
 ## Notes
 
 - Responses automatically include `Content-Length` and `Connection: close` if not provided.
